@@ -204,6 +204,55 @@ namespace KichangKim.AI.Gemini
             return JsonDocument.Parse(ms).RootElement.Clone();
         }
 
+        // *** MODIFICATION START ***
+        // Helper function to convert JSON type string to GeminiSchemaType enum
+        private GeminiSchemaType? ConvertJsonTypeToGeminiSchemaType(string typeString) => typeString?.ToLowerInvariant() switch
+        {
+            "object" => GeminiSchemaType.Object,
+            "array" => GeminiSchemaType.Array,
+            "string" => GeminiSchemaType.String,
+            "number" => GeminiSchemaType.Number,
+            "integer" => GeminiSchemaType.Integer,
+            "boolean" => GeminiSchemaType.Boolean,
+            _ => null
+        };
+
+        // Helper function to parse a schema element into a GeminiSchema object
+        private GeminiSchema ParsePropertySchema(JsonElement propertyElement)
+        {
+            var schema = new GeminiSchema();
+
+            if (propertyElement.TryGetProperty("type", out var typeProp) && typeProp.ValueKind == JsonValueKind.String)
+            {
+                schema.Type = ConvertJsonTypeToGeminiSchemaType(typeProp.GetString());
+            }
+
+            if (propertyElement.TryGetProperty("description", out var descriptionProp) && descriptionProp.ValueKind == JsonValueKind.String)
+            {
+                schema.Description = descriptionProp.GetString();
+            }
+
+            // Handle array items
+            if (schema.Type == GeminiSchemaType.Array && propertyElement.TryGetProperty("items", out var itemsProp) && itemsProp.ValueKind == JsonValueKind.Object)
+            {
+                schema.Items = ParsePropertySchema(itemsProp);
+            }
+
+            // Handle nested object properties
+            if (schema.Type == GeminiSchemaType.Object && propertyElement.TryGetProperty("properties", out var propertiesProp) && propertiesProp.ValueKind == JsonValueKind.Object)
+            {
+                var geminiProperties = new Dictionary<string, GeminiSchema>();
+                foreach (var subProperty in propertiesProp.EnumerateObject())
+                {
+                    geminiProperties[subProperty.Name] = ParsePropertySchema(subProperty.Value);
+                }
+                schema.Properties = JsonSerializer.SerializeToElement(geminiProperties, s_jsonOptions);
+            }
+
+            return schema;
+        }
+        // *** MODIFICATION END ***
+
         // Maps the abstract AI models to the Gemini-specific request model.
         private GeminiRequest BuildGeminiRequest(IEnumerable<ChatMessage> messages, ChatOptions options)
         {
@@ -257,28 +306,44 @@ namespace KichangKim.AI.Gemini
                     if (jsonFormat.Schema.HasValue)
                     {
                         var sanitizedElement = SanitizeSchemaForGemini(jsonFormat.Schema.Value);
+                        var rootSchema = new GeminiSchema();
 
-                        var newSchema = new GeminiSchema();
+                        // *** MODIFICATION START ***
+                        // Correctly parse the entire schema structure instead of just assigning properties.
                         if (sanitizedElement.TryGetProperty("type", out var typeProp) && typeProp.ValueKind == JsonValueKind.String)
                         {
-                            var typeString = typeProp.GetString();
-                            if (string.Equals(typeString, "object", StringComparison.OrdinalIgnoreCase)) newSchema.Type = GeminiSchemaType.Object;
-                            else if (string.Equals(typeString, "string", StringComparison.OrdinalIgnoreCase)) newSchema.Type = GeminiSchemaType.String;
-                            else if (string.Equals(typeString, "number", StringComparison.OrdinalIgnoreCase)) newSchema.Type = GeminiSchemaType.Number;
-                            else if (string.Equals(typeString, "integer", StringComparison.OrdinalIgnoreCase)) newSchema.Type = GeminiSchemaType.Integer;
-                            else if (string.Equals(typeString, "boolean", StringComparison.OrdinalIgnoreCase)) newSchema.Type = GeminiSchemaType.Boolean;
-                            else if (string.Equals(typeString, "array", StringComparison.OrdinalIgnoreCase)) newSchema.Type = GeminiSchemaType.Array;
+                            rootSchema.Type = ConvertJsonTypeToGeminiSchemaType(typeProp.GetString());
                         }
-                        if (sanitizedElement.TryGetProperty("properties", out var propertiesProp))
+
+                        if (sanitizedElement.TryGetProperty("properties", out var propertiesProp) && propertiesProp.ValueKind == JsonValueKind.Object)
                         {
-                            newSchema.Properties = propertiesProp;
+                            var geminiProperties = new Dictionary<string, GeminiSchema>();
+                            foreach (var property in propertiesProp.EnumerateObject())
+                            {
+                                // For each property in the schema, parse it into a valid GeminiSchema object.
+                                geminiProperties[property.Name] = ParsePropertySchema(property.Value);
+                            }
+                            // Serialize the reconstructed dictionary to JsonElement.
+                            rootSchema.Properties = JsonSerializer.SerializeToElement(geminiProperties, s_jsonOptions);
                         }
+
                         if (sanitizedElement.TryGetProperty("required", out var requiredProp) && requiredProp.ValueKind == JsonValueKind.Array)
                         {
-                            newSchema.Required = requiredProp.EnumerateArray().Select(e => e.GetString()).ToList();
+                            rootSchema.Required = requiredProp.EnumerateArray().Select(e => e.GetString()).ToList();
                         }
-                        newSchema.Description = jsonFormat.SchemaDescription;
-                        config.ResponseSchema = newSchema;
+
+                        // Use the SchemaDescription from the options.
+                        if (!string.IsNullOrEmpty(jsonFormat.SchemaDescription))
+                        {
+                            rootSchema.Description = jsonFormat.SchemaDescription;
+                        }
+                        else if (sanitizedElement.TryGetProperty("description", out var descProp) && descProp.ValueKind == JsonValueKind.String)
+                        {
+                            rootSchema.Description = descProp.GetString();
+                        }
+
+                        config.ResponseSchema = rootSchema;
+                        // *** MODIFICATION END ***
                     }
                 }
 
@@ -286,8 +351,6 @@ namespace KichangKim.AI.Gemini
                 {
                     GeminiThinkingConfig thinkingConfig = null;
 
-                    // *** MODIFICATION START ***
-                    // Handle various types for AdditionalProperties values (int, long, JsonElement)
                     if (options.AdditionalProperties.TryGetValue(ThinkingBudgetKey, out object budgetValue))
                     {
                         int? parsedBudget = null;
@@ -315,7 +378,6 @@ namespace KichangKim.AI.Gemini
                             thinkingConfig.IncludeThoughts = parsedThoughts.Value;
                         }
                     }
-                    // *** MODIFICATION END ***
 
                     if (thinkingConfig != null)
                     {
@@ -681,6 +743,12 @@ namespace KichangKim.AI.Gemini
 
             [JsonPropertyName("description")]
             public string Description { get; set; }
+
+            // *** MODIFICATION START ***
+            // Added "items" property to handle schema for array elements
+            [JsonPropertyName("items")]
+            public GeminiSchema Items { get; set; }
+            // *** MODIFICATION END ***
         }
 
         private enum GeminiSchemaType { String, Number, Integer, Boolean, Array, Object }
