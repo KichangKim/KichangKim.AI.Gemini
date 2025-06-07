@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36121.58 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KichangKim.AI.Gemini", "KichangKim.AI.Gemini.csproj", "{A27B9504-F9DC-412C-B661-4CECB0364730}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A27B9504-F9DC-412C-B661-4CECB0364730}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A27B9504-F9DC-412C-B661-4CECB0364730}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A27B9504-F9DC-412C-B661-4CECB0364730}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A27B9504-F9DC-412C-B661-4CECB0364730}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {84D785C9-AF88-4727-9190-A865EE36C18F}
+	EndGlobalSection
+EndGlobal
