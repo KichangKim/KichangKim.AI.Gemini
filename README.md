@@ -25,51 +25,32 @@ var chatOptions = new ChatOptions()
     },
 };
 
-while (true)
-{
-    Console.Write("You> ");
-    var input = Console.ReadLine();
-    Console.WriteLine();
-    
-    var response = await client.GetResponseAsync(new ChatMessage(ChatRole.User, input), chatOptions);
+var query = "What is 1 + 1 (spelling out numbers)";
+Console.WriteLine($"Q: {query}");
 
-    Console.Write("AI> ");
-    Console.WriteLine(response.Text);
-}
+var response = await client.GetResponseAsync(query, chatOptions);
+Console.Write($"A: {response.Text}");
 ```
 - Streaming response
 ```csharp
-using KichangKim.AI.Gemini;
-using Microsoft.Extensions.AI;
+var client = new GeminiChatClient(apiKey, model);
 
-var apiKey = "[YOUR GEMINI API KEY]";
-var model = "[YOUR GEMINI MODEL NAME]";
+var query = "Say long text.";
+Console.WriteLine($"Q: {query}");
 
-var client = new GeminiChatClient(apiKey, model, includeThoughts: false, thinkingBudget: 0);
-
-// For disable thinking
-var chatOptions = new ChatOptions()
+Console.Write($"A: ");
+await foreach (var update in client.GetStreamingResponseAsync(query))
 {
-    AdditionalProperties = new AdditionalPropertiesDictionary()
-    {
-        [GeminiChatClient.ThinkingBudgetKey] = 0,
-        [GeminiChatClient.IncludeThoughtsKey] = false,
-    },
-};
-
-while (true)
-{
-    Console.Write("You> ");
-    var input = Console.ReadLine();
-    Console.WriteLine();
-
-    Console.Write("AI> ");
-
-    await foreach (var update in client.GetStreamingResponseAsync(new[] { new ChatMessage(ChatRole.User, input) }, chatOptions))
-    {
-        Console.Write(update.Text);
-    }
-
-    Console.WriteLine();
+    Console.Write(update.Text);
 }
+```
+- Structured output
+```csharp
+var client = new GeminiChatClient(apiKey, model);
+
+var question = "What is 1 + 1?";
+Console.WriteLine($"Q: {question}");
+
+var response = await client.GetResponseAsync<int>(question);
+Console.WriteLine($"A : {response.Result}");
 ```
