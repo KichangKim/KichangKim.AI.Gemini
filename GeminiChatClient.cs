@@ -547,7 +547,7 @@ namespace KichangKim.AI.Gemini
         {
             if (role == ChatRole.User) return "user";
             if (role == ChatRole.Assistant) return "model";
-            if (role == ChatRole.Tool) return "tool";
+            if (role == ChatRole.Tool) return "user"; // Gemini use "user" role for function response.
             // The System role is handled by SystemInstruction and should not reach here.
             throw new ArgumentException($"Unsupported chat role: {role}", nameof(role));
         }
